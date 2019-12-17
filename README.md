@@ -26,10 +26,10 @@ We evaluate the performance on [SYSU-MM01](https://github.com/wuancong/SYSU-MM01
 
 | model             | mAP | rank-1 | rank-5 | rank-10 | rank-20 |
 | ----------------- | ------ | ------ | ------- | ------- | ------- |
-| softmax only      | 0.399001 | 0.388982 | 0.690849 | 0.803392 | 0.894452 |
-| softmax + triplet | 0.418460 | 0.415488 | 0.726479 | 0.842677 | 0.92782 |
-| softmax only + RE      | 0.458011 | 0.465685 | 0.771838 | 0.867946 | 0.939232 |
-| softmax + triplet + RE | 0.454035 | 0.461977 | 0.757954 | 0.861662 | 0.93770 |
+| softmax only      | 39.90 | 38.90 | 69.08 | 80.34 | 89.45 |
+| softmax + triplet | 41.85 | 41.55 | 72.65 | 84.27 | 92.78 |
+| softmax only + RE      | 45.80 | 46.57 | 77.18 | 86.79 | 93.92 |
+| softmax + triplet + RE | 45.40 | 46.20 | 75.80 | 86.17 | 93.77 |
 
 RE denotes RandomErasing augmentation.
 
