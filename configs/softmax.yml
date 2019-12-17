@@ -1,0 +1,39 @@
+prefix: sysu-nodual-nore-sgd-128
+
+fp16: true
+
+#d ataset
+sample_method: random
+batch_size: 128
+
+dataset: sysu
+
+# loss
+classification: true
+triplet: false
+
+
+# architecture
+drop_last_stride: true
+dual_path: false
+
+# optimizer
+lr: 0.04
+optimizer: sgd
+num_epoch: 30
+lr_step: [20]
+
+# augmentation
+random_flip: true
+random_crop: true
+random_erase: false
+color_jitter: false
+padding: 10
+
+
+# log
+log_period: 50
+eval_interval: 10
+
+
+
