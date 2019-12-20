@@ -32,6 +32,8 @@ We evaluate the performance on [SYSU-MM01](https://github.com/wuancong/SYSU-MM01
 | softmax + triplet + RE | 45.40 | 46.20 | 75.80 | 86.17 | 93.77 |
 
 RE denotes RandomErasing augmentation.
+We adopt one-stream network and find that totally two-stream network leads to inferior performance.
+Furthermore, we find that just making lower layers (e.g up to layer2) independent can lead to similar performance as one-stream network. 
 
 ## Reference 
 
