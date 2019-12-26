@@ -8,6 +8,8 @@
 * Yacs
 
 ## Utilization
+Download [SYSU-MM01](https://github.com/wuancong/SYSU-MM01) dataset and uncompress it.
+Put the [rand_perm_cam.mat](https://github.com/wuancong/SYSU-MM01/blob/master/evaluation/data_split/rand_perm_cam.mat) in `exp` directory in dataset root. This file is used to assign gallery items for each trial while testing.
 Run
 ```shell script
 CUDA_VISIBLE_DEVICES=0 python3 train.py --cfg configs/softmax.yml
