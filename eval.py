@@ -30,7 +30,7 @@ if __name__ == '__main__':
     if args.dataset is not None:
         cmd += "--dataset {}".format(args.dataset)
 
-    # subprocess.check_call(cmd.strip().split(" "))
+    subprocess.check_call(cmd.strip().split(" "))
 
     # evaluation
     q_mat_path = 'features/%s/query-%s.mat' % (dataset, prefix)
