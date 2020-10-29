@@ -3,7 +3,7 @@
 ## Dependency
 * Python 3.7
 * PyTorch 1.2
-* Ignite 
+* Ignite 0.2.0
 * Apex
 * Yacs
 
