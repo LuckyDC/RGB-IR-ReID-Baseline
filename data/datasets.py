@@ -5,10 +5,6 @@ import torch
 from PIL import Image
 from torch.utils.data import Dataset
 
-'''
-    Specific dataset classes for person re-identification dataset. 
-'''
-
 
 class SYSUDataset(Dataset):
     def __init__(self, root, mode='train', transform=None):

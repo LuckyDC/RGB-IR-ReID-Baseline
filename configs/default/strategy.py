@@ -2,7 +2,7 @@ from yacs.config import CfgNode
 
 strategy_cfg = CfgNode()
 
-strategy_cfg.prefix = "baseline"
+strategy_cfg.work_dir = "baseline"
 
 # setting for loader
 strategy_cfg.sample_method = "random"
@@ -10,15 +10,13 @@ strategy_cfg.batch_size = 128
 strategy_cfg.p_size = 16
 strategy_cfg.k_size = 8
 
-# setting for loss
-strategy_cfg.classification = True
-strategy_cfg.triplet = False
-
 # settings for optimizer
 strategy_cfg.optimizer = "sgd"
 strategy_cfg.lr = 0.1
 strategy_cfg.wd = 5e-4
-strategy_cfg.lr_step = [40]
+strategy_cfg.momentum = 0.9
+strategy_cfg.betas = (0.5, 0.999)
+strategy_cfg.lr_step = (40,)
 
 strategy_cfg.fp16 = False
 
@@ -36,8 +34,7 @@ strategy_cfg.color_jitter = False
 strategy_cfg.padding = 10
 
 # settings for base architecture
-strategy_cfg.drop_last_stride = False
-strategy_cfg.dual_path = False
+strategy_cfg.last_stride = 1
 
 # logging
 strategy_cfg.eval_interval = -1

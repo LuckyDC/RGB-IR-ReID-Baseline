@@ -1,27 +1,23 @@
-prefix: sysu-nodual-adam-16x8-128
+work_dir: sysu-adam0.9
 
-fp16: true
+fp16: false
 
 # dataset
 sample_method: identity_uniform
-p_size: 16
+p_size: 8
 k_size: 8
 
 dataset: sysu
 
-# loss
-classification: true
-triplet: true
-
 # architecture
-drop_last_stride: true
-dual_path: false
+last_stride: 1
 
 # optimizer
-lr: 0.00035
+lr: 0.01
 optimizer: adam
-num_epoch: 200
-lr_step: [150]
+betas: [ 0.5,0.999 ]
+num_epoch: 120
+lr_step: [ 40,70 ]
 
 # augmentation
 random_flip: true
@@ -32,8 +28,8 @@ padding: 10
 
 
 # log
-log_period: 10
-eval_interval: 50
+log_period: 50
+eval_interval: 10
 
 
 

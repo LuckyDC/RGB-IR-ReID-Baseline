@@ -120,7 +120,10 @@ def eval_sysu(query_feats, query_ids, query_cam_ids, gallery_feats, gallery_ids,
         r10 += cmc[9]
         r20 += cmc[19]
 
-    perf = 'mAP = %f , r1 precision = %f , r5 precision = %f , r10 precision = %f , r20 precision = %f'
-    logging.info(perf % (mAP / num_trials, r1 / num_trials, r5 / num_trials, r10 / num_trials, r20 / num_trials))
+    mAP /= num_trials
+    r1 /= num_trials
+    r5 /= num_trials
+    r10 /= num_trials
+    r20 /= num_trials
 
     return mAP, r1, r5, r10, r20

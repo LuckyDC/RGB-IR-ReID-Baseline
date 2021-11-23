@@ -1,81 +1,72 @@
+import torch
 import torch.nn as nn
-import numpy as np
+from functools import partial
 
-from models.resnet import resnet50
 from utils.calc_acc import calc_acc
-
-from layers import TripletLoss
+from models.resnet import resnet50
+from layers.separate_bn import SeparateBatchNorm
+from losses.triplet_loss import TripletLoss
 
 
 class Baseline(nn.Module):
-    def __init__(self, num_classes=None, drop_last_stride=False, dual_path=False, **kwargs):
+    def __init__(self, num_classes=None, **kwargs):
         super(Baseline, self).__init__()
-
-        self.drop_last_stride = drop_last_stride
-        self.dual_path = dual_path
-
-        if self.dual_path:
-            self.backbone_1 = resnet50(pretrained=True, drop_last_stride=drop_last_stride)
-            self.backbone_2 = resnet50(pretrained=True, drop_last_stride=drop_last_stride)
-        else:
-            self.backbone_1 = self.backbone_2 = resnet50(pretrained=True, drop_last_stride=drop_last_stride)
+        self.backbone = resnet50(pretrained=True, last_stride=1)
 
         self.bn_neck = nn.BatchNorm1d(2048)
         self.bn_neck.bias.requires_grad_(False)
+      
 
-        if kwargs.get('eval', False):
-            return
+        self._eval_mode = 'visible'
 
-        self.classification = kwargs.get('classification', False)
-        self.triplet = kwargs.get('triplet', False)
-
-        if self.classification:
+        if num_classes is not None:
             self.classifier = nn.Linear(2048, num_classes, bias=False)
+            nn.init.normal_(self.classifier.weight, std=0.001)
+
+            # losses
             self.id_loss = nn.CrossEntropyLoss(ignore_index=-1)
-        if self.triplet:
             self.triplet_loss = TripletLoss(margin=0.3)
 
+    @property
+    def eval_mode(self):
+        return self._eval_mode
+
+    @eval_mode.setter
+    def eval_mode(self, mode):
+        if mode not in ('visible', 'infrared'):
+            raise ValueError('The choice of mode is visible or infrared!')
+        self._eval_mode = mode
+
+        def set_sep_bn_mode(m, eval_mode):
+            if isinstance(m, SeparateBatchNorm):
+                m.eval_mode = eval_mode
+
+        set_sep_bn_mode = partial(set_sep_bn_mode, eval_mode=mode)
+        self.backbone.apply(set_sep_bn_mode)
+
+    def get_param_groups(self, lr, weight_decay):
+        ft_params = self.backbone.parameters()
+        new_params = [param for name, param in self.named_parameters() if not name.startswith("backbone.")]
+        param_groups = [{'params': ft_params, 'lr': lr * 0.1, 'weight_decay': weight_decay},
+                        {'params': new_params, 'lr': lr, 'weight_decay': weight_decay}]
+        return param_groups
+
     def forward(self, inputs, labels=None, **kwargs):
-        cam_ids = kwargs.get('cam_ids')
-        modal_flag_1 = np.in1d(cam_ids.cpu().numpy(), [1, 2, 4, 5])
-        modal_flag_2 = np.logical_not(modal_flag_1)
-
-        if not self.dual_path:
-            global_feat = self.backbone_1(inputs)
-        else:
-            if np.any(modal_flag_1) and np.any(modal_flag_2):
-                global_feat_1 = self.backbone_1(inputs[modal_flag_1])
-                global_feat_2 = self.backbone_2(inputs[modal_flag_2])
-
-                global_feat = global_feat_1.new_empty(size=(inputs.size(0),) + global_feat_1.size()[1:])
-                global_feat[modal_flag_1, ...] = global_feat_1
-                global_feat[modal_flag_2, ...] = global_feat_2
-            elif np.any(modal_flag_1):
-                global_feat = self.backbone_1(inputs[modal_flag_1])
-            else:
-                global_feat = self.backbone_2(inputs[modal_flag_2])
-
-        if not self.training:
-            global_feat = self.bn_neck(global_feat)
-            return global_feat
-        else:
+        global_feat = self.backbone(inputs)
+        if self.training:
             return self.train_forward(global_feat, labels, **kwargs)
+        return self.test_forward(global_feat)
 
-    def train_forward(self, inputs, labels, **kwargs):
-        loss = 0
-        metric = {}
+    def test_forward(self, feats):
+        return self.bn_neck(feats)
 
-        if self.triplet:
-            triplet_loss, _, _ = self.triplet_loss(inputs.float(), labels)
-            loss += triplet_loss
-            metric.update({'tri': triplet_loss.data})
+    def train_forward(self, feats, labels, **kwargs):
+        triplet_loss = self.triplet_loss(feats, labels)
 
-        inputs = self.bn_neck(inputs)
+        logits = self.classifier(self.bn_neck(feats))
+        cls_loss = self.id_loss(logits, labels)
 
-        if self.classification:
-            logits = self.classifier(inputs)
-            cls_loss = self.id_loss(logits.float(), labels)
-            loss += cls_loss
-            metric.update({'acc': calc_acc(logits.data, labels), 'ce': cls_loss.data})
+        loss = triplet_loss + cls_loss 
+        metrics = {'ce': cls_loss.item(), 'acc': calc_acc(logits.data, labels.data), 'tri': triplet_loss.item()}
 
-        return loss, metric
+        return loss, metrics

@@ -6,4 +6,4 @@ dataset_cfg = CfgNode()
 dataset_cfg.sysu = CfgNode()
 dataset_cfg.sysu.num_id = 395
 dataset_cfg.sysu.num_cam = 6
-dataset_cfg.sysu.data_root = "/home/chuanchen_luo/data/SYSU"
+dataset_cfg.sysu.data_root = "/home/chuanchen_luo/data/SYSU-MM01"

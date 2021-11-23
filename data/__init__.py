@@ -1,20 +1,9 @@
-import os
-
-import torch
 import torchvision.transforms as T
-
 from torch.utils.data import DataLoader
-from data.dataset import SYSUDataset
-from data.sampler import CrossModalityIdentitySampler
-from data.sampler import CrossModalityRandomSampler
 
-
-def collate_fn(batch):  # img, label, cam_id, img_path, img_id
-    samples = list(zip(*batch))
-
-    data = [torch.stack(x, 0) for i, x in enumerate(samples) if i != 3]
-    data.insert(3, samples[3])
-    return data
+from data.datasets import SYSUDataset
+from data.samplers import CrossModalityIdentitySampler
+from data.samplers import CrossModalityRandomSampler
 
 
 def get_train_loader(root, sample_method, batch_size, p_size, k_size, image_size, random_flip=False, random_crop=False,
@@ -49,8 +38,12 @@ def get_train_loader(root, sample_method, batch_size, p_size, k_size, image_size
         sampler = CrossModalityRandomSampler(train_dataset, batch_size)
 
     # loader
-    train_loader = DataLoader(train_dataset, batch_size, sampler=sampler, drop_last=True, pin_memory=True,
-                              collate_fn=collate_fn, num_workers=num_workers)
+    train_loader = DataLoader(train_dataset,
+                              batch_size=batch_size,
+                              sampler=sampler,
+                              drop_last=True,
+                              pin_memory=True,
+                              num_workers=num_workers)
 
     return train_loader
 
@@ -71,17 +64,15 @@ def get_test_loader(root, batch_size, image_size, num_workers=4):
     query_loader = DataLoader(dataset=query_dataset,
                               batch_size=batch_size,
                               shuffle=False,
-                              pin_memory=True,
+                              pin_memory=False,
                               drop_last=False,
-                              collate_fn=collate_fn,
                               num_workers=num_workers)
 
     gallery_loader = DataLoader(dataset=gallery_dataset,
                                 batch_size=batch_size,
                                 shuffle=False,
-                                pin_memory=True,
+                                pin_memory=False,
                                 drop_last=False,
-                                collate_fn=collate_fn,
                                 num_workers=num_workers)
 
     return gallery_loader, query_loader

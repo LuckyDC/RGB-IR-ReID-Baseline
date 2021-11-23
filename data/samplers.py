@@ -56,8 +56,8 @@ class CrossModalityIdentitySampler(Sampler):
     def __init__(self, dataset, p_size, k_size):
         self.dataset = dataset
         self.p_size = p_size
-        self.k_size = k_size // 2
-        self.batch_size = p_size * k_size * 2
+        self.k_size = k_size
+        self.batch_size = p_size * k_size
 
         self.id2idx_rgb = defaultdict(list)
         self.id2idx_ir = defaultdict(list)
@@ -67,15 +67,20 @@ class CrossModalityIdentitySampler(Sampler):
             else:
                 self.id2idx_rgb[identity].append(i)
 
+        self.size_rgb = sum([len(a) for a in self.id2idx_rgb.values()])
+        self.size_ir = sum([len(a) for a in self.id2idx_ir.values()])
+        self.num_iters = max(self.size_ir, self.size_rgb) // self.batch_size + 1
+
     def __len__(self):
-        return self.dataset.num_ids * self.k_size * 2
+        return self.num_iters * self.batch_size
 
     def __iter__(self):
         sample_list = []
 
-        id_perm = np.random.permutation(self.dataset.num_ids)
-        for start in range(0, self.dataset.num_ids, self.p_size):
-            selected_ids = id_perm[start:start + self.p_size]
+        id_perm = np.arange(self.dataset.num_ids)
+        # first half batch is visible and second half batch is infrared
+        for _ in range(self.num_iters):
+            selected_ids = np.random.choice(id_perm, size=self.k_size, replace=False)
 
             sample = []
             for identity in selected_ids:

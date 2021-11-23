@@ -1,36 +1,18 @@
-import logging
 import os
-import pprint
+import shutil
 
 import torch
-import yaml
-from apex import amp
 from torch import optim
+import torch.distributed as dist
 
 from data import get_test_loader
 from data import get_train_loader
 from engine import get_trainer
 from models.baseline import Baseline
+from utils.lr_scheduler import WarmupMultiStepLR
 
 
 def train(cfg):
-    # set logger
-    log_dir = os.path.join("logs/", cfg.dataset, cfg.prefix)
-    if not os.path.isdir(log_dir):
-        os.makedirs(log_dir, exist_ok=True)
-
-    logging.basicConfig(format="%(asctime)s %(message)s",
-                        filename=log_dir + "/" + "log.txt",
-                        filemode="a")
-
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    stream_handler = logging.StreamHandler()
-    stream_handler.setLevel(logging.INFO)
-    logger.addHandler(stream_handler)
-
-    logger.info(pprint.pformat(cfg))
-
     # training data loader
     train_loader = get_train_loader(root=cfg.data_root,
                                     sample_method=cfg.sample_method,
@@ -54,81 +36,89 @@ def train(cfg):
                                                        num_workers=4)
 
     # model
-    model = Baseline(num_classes=cfg.num_id,
-                     dual_path=cfg.dual_path,
-                     drop_last_stride=cfg.drop_last_stride,
-                     triplet=cfg.triplet,
-                     classification=cfg.classification)
-
+    model = Baseline(num_classes=cfg.num_id)
     model.cuda()
 
     # optimizer
     assert cfg.optimizer in ['adam', 'sgd']
+    param_groups = model.get_param_groups(lr=cfg.lr, weight_decay=cfg.wd)
     if cfg.optimizer == 'adam':
-        optimizer = optim.Adam(model.parameters(), lr=cfg.lr, weight_decay=cfg.wd)
+        optimizer = optim.Adam(param_groups, lr=cfg.lr, betas=cfg.betas, weight_decay=cfg.wd)
     else:
-        optimizer = optim.SGD(model.parameters(), lr=cfg.lr, momentum=0.9, weight_decay=cfg.wd)
+        optimizer = optim.SGD(param_groups, lr=cfg.lr, momentum=cfg.momentum, weight_decay=cfg.wd)
 
     # convert model for mixed precision training
-    model, optimizer = amp.initialize(model, optimizer, enabled=cfg.fp16, opt_level="O2")
-    lr_scheduler = optim.lr_scheduler.MultiStepLR(optimizer=optimizer,
-                                                  milestones=cfg.lr_step,
-                                                  gamma=0.1)
-
+    lr_scheduler = WarmupMultiStepLR(optimizer=optimizer,
+                                     milestones=cfg.lr_step,
+                                     gamma=0.1,
+                                     warmup_epochs=10,
+                                     warmup_factor=0.01)
     # engine
-    checkpoint_dir = os.path.join("checkpoints", cfg.dataset, cfg.prefix)
     engine = get_trainer(model=model,
                          optimizer=optimizer,
                          lr_scheduler=lr_scheduler,
-                         logger=logger,
-                         non_blocking=True,
                          log_period=cfg.log_period,
-                         save_dir=checkpoint_dir,
-                         prefix=cfg.prefix,
                          eval_interval=cfg.eval_interval,
                          gallery_loader=gallery_loader,
-                         query_loader=query_loader)
+                         query_loader=query_loader,
+                         enable_amp=cfg.fp16)
 
     # training
     engine.run(train_loader, max_epochs=cfg.num_epoch)
 
 
 if __name__ == '__main__':
+    import yaml
+    import time
     import argparse
     import random
     import numpy as np
+    from pprint import pformat
+    from datetime import timedelta
+    from runx.logx import logx
     from configs.default import strategy_cfg
     from configs.default import dataset_cfg
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cfg", type=str, default="configs/market2duke.yml")
+    parser.add_argument('cfg', type=str, help='Path to config file')
+    parser.add_argument('--work-dir', type=str, help='Directory for log and checkpoint')
+    parser.add_argument('--gpu', type=int, help='GPU device for training')
+    parser.add_argument('--local-rank', type=int, help='Rank of distributed training')
     args = parser.parse_args()
 
-    # set random seed
+    # Load configuration
+    customized_cfg = yaml.load(open(args.cfg, "r"), yaml.SafeLoader)
+    cfg = strategy_cfg
+    cfg.merge_from_file(args.cfg)
+
+    data_cfg = dataset_cfg.get(cfg.dataset)
+    for k, v in data_cfg.items():
+        cfg[k] = v
+
+    if args.work_dir is not None:
+        cfg.work_dir = args.work_dir
+
+    cfg.freeze()
+
+    # Set random seed
     seed = 0
     random.seed(seed)
-    np.random.RandomState(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
 
-    # enable cudnn backend
+    # Setup logger
+    logx.initialize(logdir=cfg.work_dir, hparams=cfg, tensorboard=True,
+                    global_rank=args.local_rank if dist.is_initialized() else 0)
+    logx.msg(pformat(cfg))
+    shutil.copytree('models', os.path.join(cfg.work_dir, 'models'), dirs_exist_ok=True)
+
+    # Setup CUDNN and GPU device
     torch.backends.cudnn.benchmark = True
+    if args.gpu is not None:
+        os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu)
 
-    # load configuration
-    customized_cfg = yaml.load(open(args.cfg, "r"), Loader=yaml.SafeLoader)
-
-    cfg = strategy_cfg
-    cfg.merge_from_file(args.cfg)
-
-    dataset_cfg = dataset_cfg.get(cfg.dataset)
-
-    for k, v in dataset_cfg.items():
-        cfg[k] = v
-
-    if cfg.sample_method == 'identity_uniform':
-        cfg.batch_size = cfg.p_size * cfg.k_size
-
-    cfg.freeze()
-
+    start_time = time.monotonic()
     train(cfg)
+    end_time = time.monotonic()
+    print('Total running time: ', timedelta(seconds=end_time - start_time))

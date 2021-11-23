@@ -1,14 +1,13 @@
 import torch
 import numpy as np
-
-from apex import amp
+from torch.cuda import amp
 from ignite.engine import Engine
 from ignite.engine import Events
-from torch.autograd import no_grad
 
 
-def create_train_engine(model, optimizer, non_blocking=False):
+def create_train_engine(model, optimizer, enable_amp=False):
     device = torch.device("cuda", torch.cuda.current_device())
+    scaler = amp.GradScaler(enabled=enable_amp)
 
     def _process_func(engine, batch):
         model.train()
@@ -16,27 +15,24 @@ def create_train_engine(model, optimizer, non_blocking=False):
         data, labels, cam_ids, img_paths, img_ids = batch
         epoch = engine.state.epoch
 
-        data = data.to(device, non_blocking=non_blocking)
-        labels = labels.to(device, non_blocking=non_blocking)
-        cam_ids = cam_ids.to(device, non_blocking=non_blocking)
+        data = data.to(device, non_blocking=True)
+        labels = labels.to(device, non_blocking=True)
+        cam_ids = cam_ids.to(device, non_blocking=True)
 
-        optimizer.zero_grad()
+        optimizer.zero_grad(set_to_none=True)
+        with amp.autocast(enabled=enable_amp):
+            loss, metric = model(data, labels=labels, cam_ids=cam_ids, epoch=epoch)
 
-        loss, metric = model(data, labels,
-                             cam_ids=cam_ids,
-                             epoch=epoch)
-
-        with amp.scale_loss(loss, optimizer) as scaled_loss:
-            scaled_loss.backward()
-
-        optimizer.step()
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
 
         return metric
 
     return Engine(_process_func)
 
 
-def create_eval_engine(model, non_blocking=False):
+def create_eval_engine(model):
     device = torch.device("cuda", torch.cuda.current_device())
 
     def _process_func(engine, batch):
@@ -44,10 +40,9 @@ def create_eval_engine(model, non_blocking=False):
 
         data, labels, cam_ids, img_paths = batch[:4]
 
-        data = data.to(device, non_blocking=non_blocking)
-
-        with no_grad():
-            feat = model(data, cam_ids=cam_ids.to(device, non_blocking=non_blocking))
+        data = data.to(device, non_blocking=True)
+        with torch.no_grad():
+            feat = model(data, cam_ids=cam_ids.to(device, non_blocking=False))
 
         return feat.data.float().cpu(), labels, cam_ids, np.array(img_paths)
 
