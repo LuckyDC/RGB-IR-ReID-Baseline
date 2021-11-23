@@ -4,7 +4,6 @@
 * Python 3.7
 * PyTorch 1.10
 * Ignite 0.4.7
-* Apex
 * Yacs
 
 ## Utilization
