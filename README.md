@@ -12,7 +12,7 @@ Change the entry `data_root` in configs/default.py to the path of the dataset.
 Put the [rand_perm_cam.mat](https://github.com/wuancong/SYSU-MM01/blob/master/evaluation/data_split/rand_perm_cam.mat) in `exp` directory in dataset root. This file is used to assign gallery items for each trial while testing.
 Run
 ```shell script
-CUDA_VISIBLE_DEVICES=0 python3 train.py --cfg configs/baseline.yml
+CUDA_VISIBLE_DEVICES=0 python3 train.py configs/baseline.yml --work-dir work_dirs/baseline 
 ```
 
 ## Performance
