@@ -13,15 +13,8 @@ Change the entry `data_root` in configs/default.py to the path of the dataset.
 Put the [rand_perm_cam.mat](https://github.com/wuancong/SYSU-MM01/blob/master/evaluation/data_split/rand_perm_cam.mat) in `exp` directory in dataset root. This file is used to assign gallery items for each trial while testing.
 Run
 ```shell script
-CUDA_VISIBLE_DEVICES=0 python3 train.py --cfg configs/softmax.yml
+CUDA_VISIBLE_DEVICES=0 python3 train.py --cfg configs/baseline.yml
 ```
-to train the model with SoftMax classification only.
-
-Or run
-```shell script
-CUDA_VISIBLE_DEVICES=0 python3 train.py --cfg configs/softmax-triplet.yml
-```
-to train the model with classification and triplet loss.
 
 ## Performance
 
@@ -29,14 +22,8 @@ We evaluate the performance on [SYSU-MM01](https://github.com/wuancong/SYSU-MM01
 
 | model             | mAP | rank-1 | rank-5 | rank-10 | rank-20 |
 | ----------------- | ------ | ------ | ------- | ------- | ------- |
-| softmax only      | 39.90 | 38.90 | 69.08 | 80.34 | 89.45 |
-| softmax + triplet | 41.85 | 41.55 | 72.65 | 84.27 | 92.78 |
-| softmax only + RE      | 45.80 | 46.57 | 77.18 | 86.79 | 93.92 |
-| softmax + triplet + RE | 45.40 | 46.20 | 75.80 | 86.17 | 93.77 |
+| baseline | 54.60	| 57.51	| 82.77 |	90.05 | 95.28 |
 
-RE denotes RandomErasing augmentation.
-We adopt one-stream network and find that totally two-stream network leads to inferior performance.
-Furthermore, we find that just making lower layers (e.g up to layer2) independent can lead to similar performance as one-stream network. 
 
 ## Reference 
 
